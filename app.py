@@ -124,13 +124,16 @@ def handle_mention(event, say):
     message = text.split(" ", 1)[1] if " " in text else ""
 
     if "show open events" in message:
-        print("\U0001F4E5 Detected 'show open events' command", flush=True)
-        events = supabase.table("events").select("*").eq("status", "open").execute()
+        print("📥 Detected 'show open events' command", flush=True)
+        events = supabase.table("events").select("*").ilike("status", "%open%").execute()
+
+        print("🧪 Raw event data from Supabase:", events.data, flush=True)
 
         if not events.data:
-            print("❌ No open events returned by Supabase", flush=True)
-            say("\U0001F4ED There are no open events right now.")
+            print("❌ Still no open events found", flush=True)
+            say("📭 There are no open events right now.")
             return
+
 
         reply = "*\U0001F3AF Open Events:*\n"
         for idx, event in enumerate(events.data, 1):
