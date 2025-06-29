@@ -125,10 +125,14 @@ def handle_mention(event, say):
     # Attempt to parse manually formatted message
     if message.startswith("bet") and " on " in message and " for " in message:
         try:
-            parts = message.split(" ")
-            amount = int(parts[1])
-            option = message.split(" on ")[1].split(" for ")[0].strip()
-            event_query = message.split(" for ")[1].strip()
+            # Example: "bet 50 on India for India vs Pakistan"
+            match = re.match(r'bet (\d+) on (.+?) for (.+)', message)
+            if not match:
+                raise ValueError("Invalid format")
+
+            amount = int(match.group(1))
+            option = match.group(2).strip()
+            event_query = match.group(3).strip()
 
             slack_user_info = app.client.users_info(user=user_id)
             name = slack_user_info["user"]["real_name"]
