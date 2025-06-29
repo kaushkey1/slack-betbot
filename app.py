@@ -2,7 +2,7 @@ from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-import openai
+from openai import OpenAI
 import os
 import json
 import re
@@ -10,19 +10,20 @@ import re
 # Load environment variables (for local dev)
 load_dotenv()
 
-# Slack and OpenAI config
+# Get environment variables
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-openai.api_key = OPENAI_API_KEY
+# Initialize OpenAI (new SDK)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Initialize Slack Bolt and Flask
+# Initialize Slack and Flask
 app = App(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
 
-# ---------- Function to Parse Bet via OpenAI ----------
+# ---------- FUNCTION: Parse bet details ----------
 def extract_bet_details(message):
     prompt = f"""
 You are a bot helping users place bets. Extract 3 pieces of info from this message:
@@ -44,8 +45,8 @@ Do not return anything else.
 """
 
     try:
-        print("📨 Sending message to OpenAI...", flush=True)
-        response = openai.ChatCompletion.create(
+        print("📨 Sending message to OpenAI (new SDK)...", flush=True)
+        response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful Slack betting assistant."},
@@ -53,10 +54,9 @@ Do not return anything else.
             ],
             temperature=0.2
         )
-        text = response['choices'][0]['message']['content']
+        text = response.choices[0].message.content
         print("🧠 OpenAI Raw Output:", text, flush=True)
 
-        # Extract JSON from the response
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             return json.loads(match.group(0))
@@ -67,7 +67,7 @@ Do not return anything else.
         print("❌ OpenAI exception:", e, flush=True)
         return {}
 
-# ---------- Route for Slack Event Subscriptions ----------
+# ---------- ROUTE: Slack Events ----------
 @flask_app.route("/slack/events", methods=["GET", "POST"])
 def slack_events():
     if request.method == "GET":
@@ -78,13 +78,13 @@ def slack_events():
         return jsonify({"challenge": data.get("challenge")})
     return handler.handle(request)
 
-# ---------- Respond to @mentions ----------
+# ---------- EVENT: Bot Mention ----------
 @app.event("app_mention")
 def handle_mention(event, say):
     user = event.get("user")
     text = event.get("text", "")
 
-    # Remove bot mention from message
+    # Remove bot mention
     message = text.split(" ", 1)[1] if " " in text else ""
 
     say(f"Got it, <@{user}>! Let me parse that...")
@@ -96,7 +96,7 @@ def handle_mention(event, say):
     else:
         say("❌ I couldn't understand your bet. Please try again with something like:\n`@Fynd-My-Bet 50 on India for Friday’s match`")
 
-# ---------- Run App on Correct Port ----------
+# ---------- START SERVER ----------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     flask_app.run(host="0.0.0.0", port=port)
