@@ -7,21 +7,22 @@ import os
 import json
 import re
 
-# Load environment variables
+# Load environment variables (for local dev)
 load_dotenv()
 
+# Slack and OpenAI config
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
 
-# Set up Slack and Flask apps
+# Initialize Slack Bolt and Flask
 app = App(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
 
-# ---------- OPENAI PARSING FUNCTION ----------
+# ---------- Function to Parse Bet via OpenAI ----------
 def extract_bet_details(message):
     prompt = f"""
 You are a bot helping users place bets. Extract 3 pieces of info from this message:
@@ -43,6 +44,7 @@ Do not return anything else.
 """
 
     try:
+        print("📨 Sending message to OpenAI...", flush=True)
         response = openai.ChatCompletion.create(
             model="gpt-4o",
             messages=[
@@ -52,19 +54,20 @@ Do not return anything else.
             temperature=0.2
         )
         text = response['choices'][0]['message']['content']
-        print("🧠 OpenAI Raw Output:", text)
+        print("🧠 OpenAI Raw Output:", text, flush=True)
 
-        # Extract JSON using regex (handles triple backticks etc.)
+        # Extract JSON from the response
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             return json.loads(match.group(0))
         else:
+            print("⚠️ No valid JSON found in OpenAI output", flush=True)
             return {}
     except Exception as e:
-        print("❌ OpenAI error:", e)
+        print("❌ OpenAI exception:", e, flush=True)
         return {}
 
-# ---------- SLACK EVENTS ROUTE ----------
+# ---------- Route for Slack Event Subscriptions ----------
 @flask_app.route("/slack/events", methods=["GET", "POST"])
 def slack_events():
     if request.method == "GET":
@@ -75,13 +78,13 @@ def slack_events():
         return jsonify({"challenge": data.get("challenge")})
     return handler.handle(request)
 
-# ---------- HANDLE BOT MENTIONS ----------
+# ---------- Respond to @mentions ----------
 @app.event("app_mention")
 def handle_mention(event, say):
     user = event.get("user")
     text = event.get("text", "")
 
-    # Remove bot mention from start of message
+    # Remove bot mention from message
     message = text.split(" ", 1)[1] if " " in text else ""
 
     say(f"Got it, <@{user}>! Let me parse that...")
@@ -93,7 +96,7 @@ def handle_mention(event, say):
     else:
         say("❌ I couldn't understand your bet. Please try again with something like:\n`@Fynd-My-Bet 50 on India for Friday’s match`")
 
-# ---------- RUN FLASK SERVER ----------
+# ---------- Run App on Correct Port ----------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     flask_app.run(host="0.0.0.0", port=port)
