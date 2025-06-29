@@ -48,7 +48,7 @@ Do not return anything else.
 """
 
     try:
-        print("\U0001F4E8 Sending message to OpenAI (legacy API)...", flush=True)
+        print("📨 Sending message to OpenAI (legacy API)...", flush=True)
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -58,16 +58,16 @@ Do not return anything else.
             temperature=0.2
         )
         text = response['choices'][0]['message']['content']
-        print("\U0001F9E0 OpenAI Raw Output:", text, flush=True)
+        print("🧠 OpenAI Raw Output:", text, flush=True)
 
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             return json.loads(match.group(0))
         else:
-            print("\u26A0\uFE0F No valid JSON found in OpenAI output", flush=True)
+            print("⚠️ No valid JSON found in OpenAI output", flush=True)
             return {}
     except Exception as e:
-        print("\u274C OpenAI exception:", e, flush=True)
+        print("❌ OpenAI exception:", e, flush=True)
         return {}
 
 # ---------- FUNCTION: Get or Create User ----------
@@ -93,7 +93,7 @@ def find_event_by_name(query):
 # ---------- FUNCTION: Place Bet ----------
 def place_bet(user, event, amount, option):
     if user["credits"] < amount:
-        return False, "\u274C You don't have enough credits."
+        return False, "❌ You don't have enough credits."
 
     credit_update = supabase.table("users").update({
         "credits": user["credits"] - amount
@@ -169,14 +169,15 @@ def handle_mention(event, say):
             event = find_event_by_name(event_query)
 
             if not event:
-                say(f"\u274C I couldn’t find any open event matching '{event_query}'")
+                say(f"❌ I couldn’t find any open event matching '{event_query}'")
                 return
+
             try:
                 success, response = place_bet(user, event, amount, option)
                 say(response)
             except Exception as e:
-                print(\"❌ Bet placement failed:\", e, flush=True)
-                say(\"❌ Something went wrong placing your bet. Please try again or contact support.\")
+                print("❌ Bet placement failed:", e, flush=True)
+                say("❌ Something went wrong placing your bet. Please try again or contact support.")
             return
         except Exception as e:
             print("❌ Manual format parse error:", e, flush=True)
