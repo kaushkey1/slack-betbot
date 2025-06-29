@@ -84,7 +84,7 @@ def get_or_create_user(slack_id, name):
 
 # ---------- FUNCTION: Find Matching Event ----------
 def find_event_by_name(query):
-    events = supabase.table("events").select("*").ilike("status", "open").execute()
+    events = supabase.table("events").select("*").ilike("status", "%open%").execute()
     for event in events.data:
         if query.lower() in event["title"].lower():
             return event
@@ -94,16 +94,27 @@ def find_event_by_name(query):
 def place_bet(user, event, amount, option):
     if user["credits"] < amount:
         return False, "\u274C You don't have enough credits."
-    supabase.table("users").update({
+
+    credit_update = supabase.table("users").update({
         "credits": user["credits"] - amount
     }).eq("id", user["id"]).execute()
-    supabase.table("bets").insert({
+
+    if not credit_update.data:
+        return False, "❌ Failed to deduct credits."
+
+    bet_insert = supabase.table("bets").insert({
         "user_id": user["id"],
         "event_id": event["id"],
         "amount": amount,
         "option": option
     }).execute()
-    return True, f"\u2705 Bet placed! You bet *{amount}* credits on *{option}* for *{event['title']}*."
+
+    if not bet_insert.data:
+        supabase.table("users").update({"credits": user["credits"]}).eq("id", user["id"]).execute()
+        print("❌ Failed to insert bet. Response:", bet_insert, flush=True)
+        return False, "❌ Bet insert failed. Your credits were restored."
+
+    return True, f"✅ Bet placed! You bet *{amount}* credits on *{option}* for *{event['title']}*."
 
 # ---------- ROUTE: Slack Events ----------
 @flask_app.route("/slack/events", methods=["GET", "POST"])
@@ -118,20 +129,18 @@ def slack_events():
 # ---------- EVENT: Bot Mention ----------
 @app.event("app_mention")
 def handle_mention(event, say):
-    print("⚡️ Slack mention handler triggered", flush=True)
     user_id = event.get("user")
     text = event.get("text", "").strip().lower()
     message = text.split(" ", 1)[1] if " " in text else ""
 
     if "show open events" in message:
         print("📥 Detected 'show open events' command", flush=True)
-        events = supabase.table("events").select("*").execute()
-
+        events = supabase.table("events").select("*").ilike("status", "%open%").execute()
         print("🧪 Raw ALL event data from Supabase:", events.data, flush=True)
 
         if not events.data:
-            print("❌ Even unfiltered query returned no events", flush=True)
-            say("📭 There are no events at all.")
+            print("❌ Still no open events found", flush=True)
+            say("📭 There are no open events right now.")
             return
 
         reply = "*🎯 Open Events:*\n"
@@ -142,7 +151,6 @@ def handle_mention(event, say):
 
         say(reply)
         return
-
 
     if message.startswith("bet") and " on " in message and " for " in message:
         try:
