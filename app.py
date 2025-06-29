@@ -2,21 +2,20 @@ from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-from openai import OpenAI
+import openai
 import os
 import json
 import re
 
-# Load environment variables (for local dev)
+# Load environment variables
 load_dotenv()
 
-# Get environment variables
+# Slack and OpenAI credentials
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN")
 SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-# Initialize OpenAI (new SDK)
-client = OpenAI(api_key=OPENAI_API_KEY)
+openai.api_key = OPENAI_API_KEY
 
 # Initialize Slack and Flask
 app = App(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
@@ -45,16 +44,16 @@ Do not return anything else.
 """
 
     try:
-        print("📨 Sending message to OpenAI (new SDK)...", flush=True)
-        response = client.chat.completions.create(
-            model="gpt-4o",
+        print("📨 Sending message to OpenAI (legacy API)...", flush=True)
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful Slack betting assistant."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.2
         )
-        text = response.choices[0].message.content
+        text = response['choices'][0]['message']['content']
         print("🧠 OpenAI Raw Output:", text, flush=True)
 
         match = re.search(r'\{.*\}', text, re.DOTALL)
@@ -84,7 +83,6 @@ def handle_mention(event, say):
     user = event.get("user")
     text = event.get("text", "")
 
-    # Remove bot mention
     message = text.split(" ", 1)[1] if " " in text else ""
 
     say(f"Got it, <@{user}>! Let me parse that...")
@@ -94,7 +92,7 @@ def handle_mention(event, say):
     if bet and "amount" in bet and "option" in bet and "event_query" in bet:
         say(f"🧠 You want to bet *{bet['amount']}* credits on *{bet['option']}* for *{bet['event_query']}*.")
     else:
-        say("❌ I couldn't understand your bet. Please try again with something like:\n`@Fynd-My-Bet 50 on India for Friday’s match`")
+        say("❌ I couldn't understand your bet. Try something like:\n`@Fynd-My-Bet 50 on India for Friday’s match`")
 
 # ---------- START SERVER ----------
 if __name__ == "__main__":
