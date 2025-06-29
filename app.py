@@ -119,13 +119,40 @@ def slack_events():
 @app.event("app_mention")
 def handle_mention(event, say):
     user_id = event.get("user")
-    text = event.get("text", "")
+    text = event.get("text", "").strip().lower()
     message = text.split(" ", 1)[1] if " " in text else ""
-    say(f"Got it, <@{user_id}>! Let me parse that...")
 
+    # Attempt to parse manually formatted message
+    if message.startswith("bet") and " on " in message and " for " in message:
+        try:
+            parts = message.split(" ")
+            amount = int(parts[1])
+            option = message.split(" on ")[1].split(" for ")[0].strip()
+            event_query = message.split(" for ")[1].strip()
+
+            slack_user_info = app.client.users_info(user=user_id)
+            name = slack_user_info["user"]["real_name"]
+
+            user = get_or_create_user(slack_id=user_id, name=name)
+            event = find_event_by_name(event_query)
+
+            if not event:
+                say(f"\u274C I couldn’t find any open event matching '{event_query}'")
+                return
+
+            success, response = place_bet(user, event, amount, option)
+            say(response)
+            return
+        except Exception as e:
+            print("❌ Manual format parse error:", e, flush=True)
+            say("❌ Invalid format. Try: `@Fynd-My-Bet bet 50 on India for India vs Pakistan`")
+            return
+
+    # Otherwise, fallback to OpenAI parser
+    say(f"Got it, <@{user_id}>! Let me parse that...")
     bet = extract_bet_details(message)
     if not (bet and "amount" in bet and "option" in bet and "event_query" in bet):
-        say("\u274C I couldn't understand your bet. Try: `@Fynd-My-Bet 50 on India for Friday's match`")
+        say("❌ I couldn't understand your bet. Try: `@Fynd-My-Bet bet 50 on India for Friday's match`")
         return
 
     slack_user_info = app.client.users_info(user=user_id)
@@ -135,7 +162,7 @@ def handle_mention(event, say):
     event = find_event_by_name(bet["event_query"])
 
     if not event:
-        say(f"\u274C I couldn’t find any open event matching '{bet['event_query']}'")
+        say(f"❌ I couldn’t find any open event matching '{bet['event_query']}'")
         return
 
     success, response = place_bet(user, event, bet["amount"], bet["option"])
@@ -145,4 +172,3 @@ def handle_mention(event, say):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     flask_app.run(host="0.0.0.0", port=port)
-    
