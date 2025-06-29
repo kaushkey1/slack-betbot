@@ -175,6 +175,24 @@ def handle_mention(event, say):
     success, response = place_bet(user, event, bet["amount"], bet["option"])
     say(response)
 
+#open events
+if "show open events" in message:
+    events = supabase.table("events").select("*").eq("status", "open").execute()
+
+    if not events.data:
+        say("📭 There are no open events right now.")
+        return
+
+    reply = "*🎯 Open Events:*\n"
+    for idx, event in enumerate(events.data, 1):
+        title = event["title"]
+        options = ", ".join(event["options"]) if isinstance(event["options"], list) else str(event["options"])
+        reply += f"{idx}. {title} — Options: {options}\n"
+
+    say(reply)
+    return
+
+
 # ---------- START SERVER ----------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
