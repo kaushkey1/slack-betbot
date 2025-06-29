@@ -72,14 +72,17 @@ Do not return anything else.
 
 # ---------- FUNCTION: Get or Create User ----------
 def get_or_create_user(slack_id, name):
-    result = supabase.table("users").select("*").eq("slack_id", slack_id).single().execute()
-    if result.data:
-        return result.data
+    result = supabase.table("users").select("*").eq("slack_id", slack_id).execute()
+
+    if result.data and len(result.data) > 0:
+        return result.data[0]
+
     insert_result = supabase.table("users").insert({
         "slack_id": slack_id,
         "name": name,
         "credits": 100
     }).execute()
+
     return insert_result.data[0]
 
 # ---------- FUNCTION: Find Matching Event ----------
