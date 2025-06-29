@@ -146,7 +146,7 @@ def handle_mention(event, say):
 
     if message.startswith("bet") and " on " in message and " for " in message:
         try:
-            match = re.match(r'bet (\d+) on (.+?) for (.+)', message)
+            match = re.search(r'bet (\d+) on (.+?) for (.+)', message)
             if not match:
                 raise ValueError("Invalid format")
 
