@@ -46,7 +46,7 @@ Do not return anything else.
     try:
         print("📨 Sending message to OpenAI (legacy API)...", flush=True)
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a helpful Slack betting assistant."},
                 {"role": "user", "content": prompt}
