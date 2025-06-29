@@ -32,9 +32,9 @@ def extract_bet_details(message):
 You are a bot helping users place bets. Extract 3 pieces of info from this message:
 1. The amount they want to bet (a number).
 2. The team or option they are betting on.
-3. The description of the event or match (like \"Friday's match\").
+3. The description of the event or match (like "Friday's match").
 
-Input: \"{message}\"
+Input: "{message}"
 
 Only return a valid JSON object like this:
 {{
@@ -48,7 +48,7 @@ Do not return anything else.
 """
 
     try:
-        print("\U0001F4E8 Sending message to OpenAI (legacy API)...", flush=True)
+        print("📨 Sending message to OpenAI (legacy API)...", flush=True)
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -58,31 +58,28 @@ Do not return anything else.
             temperature=0.2
         )
         text = response['choices'][0]['message']['content']
-        print("\U0001F9E0 OpenAI Raw Output:", text, flush=True)
+        print("🧠 OpenAI Raw Output:", text, flush=True)
 
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             return json.loads(match.group(0))
         else:
-            print("\u26A0\uFE0F No valid JSON found in OpenAI output", flush=True)
+            print("⚠️ No valid JSON found in OpenAI output", flush=True)
             return {}
     except Exception as e:
-        print("\u274C OpenAI exception:", e, flush=True)
+        print("❌ OpenAI exception:", e, flush=True)
         return {}
 
 # ---------- FUNCTION: Get or Create User ----------
 def get_or_create_user(slack_id, name):
     result = supabase.table("users").select("*").eq("slack_id", slack_id).execute()
-
     if result.data and len(result.data) > 0:
         return result.data[0]
-
     insert_result = supabase.table("users").insert({
         "slack_id": slack_id,
         "name": name,
         "credits": 100
     }).execute()
-
     return insert_result.data[0]
 
 # ---------- FUNCTION: Find Matching Event ----------
@@ -96,7 +93,7 @@ def find_event_by_name(query):
 # ---------- FUNCTION: Place Bet ----------
 def place_bet(user, event, amount, option):
     if user["credits"] < amount:
-        return False, "\u274C You don't have enough credits."
+        return False, "❌ You don't have enough credits."
     supabase.table("users").update({
         "credits": user["credits"] - amount
     }).eq("id", user["id"]).execute()
@@ -106,7 +103,7 @@ def place_bet(user, event, amount, option):
         "amount": amount,
         "option": option
     }).execute()
-    return True, f"\u2705 Bet placed! You bet *{amount}* credits on *{option}* for *{event['title']}*."
+    return True, f"✅ Bet placed! You bet *{amount}* credits on *{option}* for *{event['title']}*."
 
 # ---------- ROUTE: Slack Events ----------
 @flask_app.route("/slack/events", methods=["GET", "POST"])
@@ -125,10 +122,25 @@ def handle_mention(event, say):
     text = event.get("text", "").strip().lower()
     message = text.split(" ", 1)[1] if " " in text else ""
 
+    if "show open events" in message:
+        events = supabase.table("events").select("*").eq("status", "open").execute()
+
+        if not events.data:
+            say("📭 There are no open events right now.")
+            return
+
+        reply = "*🎯 Open Events:*\n"
+        for idx, event in enumerate(events.data, 1):
+            title = event["title"]
+            options = ", ".join(event["options"]) if isinstance(event["options"], list) else str(event["options"])
+            reply += f"{idx}. {title} — Options: {options}\n"
+
+        say(reply)
+        return
+
     # Attempt to parse manually formatted message
     if message.startswith("bet") and " on " in message and " for " in message:
         try:
-            # Example: "bet 50 on India for India vs Pakistan"
             match = re.match(r'bet (\d+) on (.+?) for (.+)', message)
             if not match:
                 raise ValueError("Invalid format")
@@ -144,7 +156,7 @@ def handle_mention(event, say):
             event = find_event_by_name(event_query)
 
             if not event:
-                say(f"\u274C I couldn’t find any open event matching '{event_query}'")
+                say(f"❌ I couldn't find any open event matching '{event_query}'")
                 return
 
             success, response = place_bet(user, event, amount, option)
@@ -169,29 +181,11 @@ def handle_mention(event, say):
     event = find_event_by_name(bet["event_query"])
 
     if not event:
-        say(f"❌ I couldn’t find any open event matching '{bet['event_query']}'")
+        say(f"❌ I couldn't find any open event matching '{bet['event_query']}'")
         return
 
     success, response = place_bet(user, event, bet["amount"], bet["option"])
     say(response)
-
-#open events
-if "show open events" in message:
-    events = supabase.table("events").select("*").eq("status", "open").execute()
-
-    if not events.data:
-        say("📭 There are no open events right now.")
-        return
-
-    reply = "*🎯 Open Events:*\n"
-    for idx, event in enumerate(events.data, 1):
-        title = event["title"]
-        options = ", ".join(event["options"]) if isinstance(event["options"], list) else str(event["options"])
-        reply += f"{idx}. {title} — Options: {options}\n"
-
-    say(reply)
-    return
-
 
 # ---------- START SERVER ----------
 if __name__ == "__main__":
