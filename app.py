@@ -125,25 +125,24 @@ def handle_mention(event, say):
 
     if "show open events" in message:
         print("📥 Detected 'show open events' command", flush=True)
-        events = supabase.table("events").select("*").ilike("status", "%open%").execute()
+        events = supabase.table("events").select("*").execute()
 
-        print("🧪 Raw event data from Supabase:", events.data, flush=True)
+        print("🧪 Raw ALL event data from Supabase:", events.data, flush=True)
 
         if not events.data:
-            print("❌ Still no open events found", flush=True)
-            say("📭 There are no open events right now.")
+            print("❌ Even unfiltered query returned no events", flush=True)
+            say("📭 There are no events at all.")
             return
 
-
-        reply = "*\U0001F3AF Open Events:*\n"
+        reply = "*🎯 Open Events:*\n"
         for idx, event in enumerate(events.data, 1):
-            print("➡️ Found event:", event, flush=True)
             title = event["title"]
             options = ", ".join(event["options"]) if isinstance(event["options"], list) else str(event["options"])
             reply += f"{idx}. {title} — Options: {options}\n"
 
         say(reply)
         return
+
 
     if message.startswith("bet") and " on " in message and " for " in message:
         try:
