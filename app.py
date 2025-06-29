@@ -84,7 +84,7 @@ def get_or_create_user(slack_id, name):
 
 # ---------- FUNCTION: Find Matching Event ----------
 def find_event_by_name(query):
-    events = supabase.table("events").select("*").eq("status", "open").execute()
+    events = supabase.table("events").select("*").ilike("status", "open").execute()
     for event in events.data:
         if query.lower() in event["title"].lower():
             return event
