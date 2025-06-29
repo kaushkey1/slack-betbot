@@ -171,9 +171,12 @@ def handle_mention(event, say):
             if not event:
                 say(f"\u274C I couldn’t find any open event matching '{event_query}'")
                 return
-
-            success, response = place_bet(user, event, amount, option)
-            say(response)
+            try:
+                success, response = place_bet(user, event, amount, option)
+                say(response)
+            except Exception as e:
+                print(\"❌ Bet placement failed:\", e, flush=True)
+                say(\"❌ Something went wrong placing your bet. Please try again or contact support.\")
             return
         except Exception as e:
             print("❌ Manual format parse error:", e, flush=True)
