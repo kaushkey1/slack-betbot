@@ -130,8 +130,19 @@ def slack_events():
 @app.event("app_mention")
 def handle_mention(event, say):
     user_id = event.get("user")
-    text = event.get("text", "").strip().lower()
-    message = text.split(" ", 1)[1] if " " in text else ""
+    text = event.get("text", "").strip()
+    message = text.split(" ", 1)[1].strip().lower() if " " in text else ""
+
+    if message == "hello":
+        say("""👋 Hey, I'm *Fynd-My-Bet* — your office betting buddy!
+
+Here’s what I can do:
+• `bet 50 on India for India vs Pakistan` — Place a bet
+• `show open events` — See all live events
+• `leaderboard` — Check top players
+• `mybets` — View your current bets
+• *(More commands coming soon!)*""")
+        return
 
     if "show open events" in message:
         print("📥 Detected 'show open events' command", flush=True)
